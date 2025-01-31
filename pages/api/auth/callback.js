@@ -35,8 +35,8 @@ export default async function handler(req, res) {
       );
 
       // ✅ Updated redirect URL
-      res.redirect(`https://new-next-shop.vercel.app/products?host=${req.query.host}&shop=${shop}`);
-    } catch (error) {
+      res.redirect(`https://new-next-shop.vercel.app/about?host=${req.query.host}&shop=${shop}`);
+
       console.error("Error during OAuth callback:", error);
       res.status(500).send("Error during authentication");
     } finally {
