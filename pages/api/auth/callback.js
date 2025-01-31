@@ -1,63 +1,65 @@
 import shopify from "@/utils/shopify";
-import { MongoClient } from "mongodb";
+import connectToDatabase from "@/utils/database";
 import Cookies from "cookies";
-
-const uri = process.env.MONGO_URI;
-const client = new MongoClient(uri);
+import { Shopify } from "@shopify/shopify-api";
+import Session from "@/src/models/session";
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
     try {
+      const { hmac, ...params } = req.query;
+
+      // ✅ Validate HMAC Signature for security
+      if (!Shopify.Utils.validateHmac(hmac, params, process.env.SHOPIFY_API_SECRET)) {
+        throw new Error("Invalid HMAC signature detected.");
+      }
+
+      // ✅ Shopify OAuth Callback
       const { session } = await shopify.auth.callback({
         rawRequest: req,
         rawResponse: res,
       });
 
-      // Save session details to MongoDB
-      await client.connect();
-      const database = client.db("shopifyapp");
-      const sessions = database.collection("sessions");
+      console.log("🔹 Shopify Session Data:", session);
 
+      if (!session?.shop || !session?.accessToken) {
+        throw new Error("Session missing required fields (shop, accessToken)");
+      }
+
+      // ✅ Connect to MongoDB
+      await connectToDatabase();
+
+      // ✅ Store session in MongoDB (upsert)
       const { shop, accessToken, scope } = session;
-      const sessionData = {
-        shop,
-        accessToken,
-        scope,
-        installed: true, // Mark app as installed
-        createdAt: new Date(),
-      };
-
-      await sessions.updateOne(
-        { shop },
-        { $set: sessionData },
+      await Session.findOneAndUpdate(
+        { shop },  // Use `Session` model here
+        { shop, accessToken, scope, installed: true, createdAt: new Date() },
         { upsert: true }
       );
 
-      // Save session data to cookies
+      // ✅ Save session data in secure HTTP-only cookies
       const cookies = new Cookies(req, res);
-      cookies.set("shopify-app", JSON.stringify(sessionData), {
-        httpOnly: true,  // Prevent client-side access to cookie
-        secure: process.env.NODE_ENV === "production", // Use HTTPS in production
-        sameSite: "none", // Allow cookies in cross-origin requests
-        path: "/",  // Make the cookie available across the whole site
+      cookies.set("shopify-app", JSON.stringify({ shop, accessToken, installed: true }), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "none",
+        path: "/",
       });
 
-      // Debugging - Log the cookie to check if it's being set
-      console.log("Cookies Set:", cookies.get("shopify-app"));
+      console.log("✅ Session saved in MongoDB and cookies.");
 
-      // Redirect to /products after successful OAuth
+      // ✅ Redirect to /products after successful authentication
       res.redirect(`/products`);
     } catch (error) {
-      console.error("Error during OAuth callback:", error);
+      console.error("❌ OAuth Callback Error:", error);
       res.status(500).send("Error during authentication");
-    } finally {
-      await client.close();
     }
   } else {
     res.setHeader("Allow", ["GET"]);
     res.status(405).send("Method Not Allowed");
   }
 }
+
 
 
 
