@@ -12,15 +12,13 @@ export default async function handler(req, res) {
         rawResponse: res,
       });
 
-
-
       // Save session details to MongoDB or another storage
       await client.connect();
       const database = client.db("shopifyapp");
       const sessions = database.collection("sessions");
 
       const { shop, accessToken, scope, isOnline, expires } = session;
-         
+
       const sessionData = {
         shop,
         accessToken,
@@ -36,10 +34,8 @@ export default async function handler(req, res) {
         { upsert: true }
       );
 
-  
-
-    
-      res.redirect(`https://next-shopapp-non-embedded.vercel.app/products?host=${req.query.host}&shop=${shop}`);
+      // ✅ Updated redirect URL
+      res.redirect(`https://new-next-shop.vercel.app/products?host=${req.query.host}&shop=${shop}`);
     } catch (error) {
       console.error("Error during OAuth callback:", error);
       res.status(500).send("Error during authentication");
