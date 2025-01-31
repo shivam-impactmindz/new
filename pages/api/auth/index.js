@@ -9,7 +9,7 @@ export default async function handler(req, res) {
       await shopify.auth.begin({
         shop,
         callbackPath: "/api/auth/callback",
-        isOnline: true, // Use `true` for online sessions
+        isOnline: false, // Use `true` for online sessions
         rawRequest: req,
         rawResponse: res,
       });
