@@ -7,16 +7,12 @@ import Session from "@/src/models/session";
 export default async function handler(req, res) {
   if (req.method === "GET") {
     try {
-      console.log("🔹 Query Parameters:", req.query);
-
       const { hmac, ...params } = req.query;
 
       // ✅ Validate HMAC Signature for security
       if (!Shopify.Utils.validateHmac(hmac, params, process.env.SHOPIFY_API_SECRET)) {
         throw new Error("Invalid HMAC signature detected.");
       }
-
-      console.log("🔹 HMAC validation successful.");
 
       // ✅ Shopify OAuth Callback
       const { session } = await shopify.auth.callback({
@@ -32,17 +28,16 @@ export default async function handler(req, res) {
 
       // ✅ Connect to MongoDB
       await connectToDatabase();
-      console.log("🔹 Connected to MongoDB.");
 
       // ✅ Store session in MongoDB (upsert)
       const { shop, accessToken, scope } = session;
       await Session.findOneAndUpdate(
-        { shop },
+        { shop }, // Use `shop` as the unique identifier
         { shop, accessToken, scope, installed: true, createdAt: new Date() },
         { upsert: true }
       );
 
-      console.log("🔹 Session saved in MongoDB.");
+      console.log("✅ Session saved in MongoDB.");
 
       // ✅ Save session data in secure HTTP-only cookies
       const cookies = new Cookies(req, res);
@@ -53,10 +48,11 @@ export default async function handler(req, res) {
         path: "/",
       });
 
-      console.log("✅ Session saved in MongoDB and cookies.");
+      console.log("✅ Session saved in cookies.");
 
-      // ✅ Redirect to /products after successful authentication
-      res.redirect(`/products`);
+      // ✅ Save session data in local storage (via client-side JavaScript)
+      // Redirect to a page that will handle local storage saving
+      res.redirect(`/save-to-local-storage?shop=${shop}&accessToken=${accessToken}`);
     } catch (error) {
       console.error("❌ OAuth Callback Error:", error);
       res.status(500).send("Error during authentication");
@@ -66,8 +62,6 @@ export default async function handler(req, res) {
     res.status(405).send("Method Not Allowed");
   }
 }
-
-
 
 
 
