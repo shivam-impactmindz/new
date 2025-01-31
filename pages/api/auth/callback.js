@@ -7,12 +7,16 @@ import Session from "@/src/models/session";
 export default async function handler(req, res) {
   if (req.method === "GET") {
     try {
+      console.log("🔹 Query Parameters:", req.query);
+
       const { hmac, ...params } = req.query;
 
       // ✅ Validate HMAC Signature for security
       if (!Shopify.Utils.validateHmac(hmac, params, process.env.SHOPIFY_API_SECRET)) {
         throw new Error("Invalid HMAC signature detected.");
       }
+
+      console.log("🔹 HMAC validation successful.");
 
       // ✅ Shopify OAuth Callback
       const { session } = await shopify.auth.callback({
@@ -28,14 +32,17 @@ export default async function handler(req, res) {
 
       // ✅ Connect to MongoDB
       await connectToDatabase();
+      console.log("🔹 Connected to MongoDB.");
 
       // ✅ Store session in MongoDB (upsert)
       const { shop, accessToken, scope } = session;
       await Session.findOneAndUpdate(
-        { shop },  // Use `Session` model here
+        { shop },
         { shop, accessToken, scope, installed: true, createdAt: new Date() },
         { upsert: true }
       );
+
+      console.log("🔹 Session saved in MongoDB.");
 
       // ✅ Save session data in secure HTTP-only cookies
       const cookies = new Cookies(req, res);
