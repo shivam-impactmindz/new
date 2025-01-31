@@ -7,18 +7,33 @@ const client = new MongoClient(uri);
 export default async function handler(req, res) {
   if (req.method === "GET") {
     try {
+      console.log("🔹 Query Parameters:", req.query);
+
+      const { hmac, ...params } = req.query;
+
+      // ✅ Validate HMAC Signature for security
+      if (!Shopify.Utils.validateHmac(hmac, params, process.env.SHOPIFY_API_SECRET)) {
+        throw new Error("Invalid HMAC signature detected.");
+      }
+
+      console.log("🔹 HMAC validation successful.");
+
+      // ✅ Shopify OAuth Callback
       const { session } = await shopify.auth.callback({
         rawRequest: req,
         rawResponse: res,
       });
 
-      // Validate session data
+      console.log("🔹 Shopify Session Data:", session);
+
       if (!session?.shop || !session?.accessToken) {
         throw new Error("Session missing required fields (shop, accessToken)");
       }
 
-      // Save session details to MongoDB
+      // ✅ Save session details to MongoDB
       await client.connect();
+      console.log("🔹 Connected to MongoDB.");
+
       const database = client.db("shopifyapp");
       const sessions = database.collection("sessions");
 
@@ -42,7 +57,7 @@ export default async function handler(req, res) {
 
       console.log("✅ Session saved in MongoDB.");
 
-      // Redirect to the /products page
+      // ✅ Redirect to the /products page
       res.redirect(`/products?shop=${shop}`);
     } catch (error) {
       console.error("❌ Error during OAuth callback:", error);
